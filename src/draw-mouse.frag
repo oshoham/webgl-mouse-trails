@@ -18,10 +18,10 @@ void main() {
 
   st.y = 1.0 - st.y;
 
-  st.x -= mouse.x * 1.25;
-  st.y += mouse.y * 1.25 - 1.25;
-  
-  st = st / mouse_scale * 0.75;
+  st.x -= mouse.x * 2.0;
+  st.y += mouse.y * 2.0 - 2.0;
+
+  st = st / mouse_scale * 0.65;
 
   vec4 tex_color = texture2D(u_tex0, st);
 
