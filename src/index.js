@@ -47,7 +47,7 @@ cursorStyle.innerHTML = `
 document.body.appendChild(cursorStyle)
 
 
-const fboScale = 0.75
+const fboScale = 1.0
 const width = 2 * Math.round((regl._gl.canvas.clientWidth * fboScale) / 2)
 const height = 2 * Math.round((regl._gl.canvas.clientHeight * fboScale) / 2)
 const initialConditions = (Array(width * height * 4)).fill(1)
