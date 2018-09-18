@@ -17,6 +17,7 @@ module.exports = {
   },
   devServer: {
     contentBase: BUILD_DIR,
+    disableHostCheck: true
   },
   module: {
     rules: [
