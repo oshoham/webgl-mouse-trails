@@ -1,7 +1,30 @@
 const canvas = document.getElementById('regl-canvas')
 const regl = require('regl')()
 const resl = require('resl')
-const mouse = require('mouse-change')()
+
+let hasMouseMoved = false
+const mouse = { x: 0, y: 0 }
+const mouseChange = require('mouse-change')((buttonState, x, y) => {
+  if (!hasMouseMoved) {
+    hasMouseMoved = true
+  }
+  mouse.x = x
+  mouse.y = y
+})
+const Hammer = require('hammerjs')
+const hammer = new Hammer(regl._gl.canvas)
+hammer.on('pan', (e) => {
+  if (!hasMouseMoved) {
+    hasMouseMoved = true
+  }
+  mouse.x = e.center.x
+  mouse.y = e.center.y
+})
+regl._gl.canvas.addEventListener('touchend', (e) => {
+  if (hasMouseMoved) {
+    hasMouseMoved = false
+  }
+})
 
 const fragmentShader = require('./main.frag')
 const chromakeyShader = require('./chromakey.frag')
@@ -22,6 +45,7 @@ cursorStyle.innerHTML = `
   }
 `
 document.body.appendChild(cursorStyle)
+
 
 const fboScale = 0.75
 const width = 2 * Math.round((regl._gl.canvas.clientWidth * fboScale) / 2)
@@ -64,6 +88,10 @@ const drawCursor = regl({
       cursorHeight / boundingRect.height
     ],
     u_mouse: ({ boundingRect }) => {
+      if (!hasMouseMoved) {
+        return [-1, -1]
+      }
+
       let mouseX
       if (mouse.x <= boundingRect.left) {
         mouseX = 0
