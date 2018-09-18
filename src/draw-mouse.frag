@@ -4,24 +4,20 @@ precision mediump float;
 
 varying vec2 v_texcoord;
 
-uniform vec2 u_resolution;
 uniform vec2 u_mouse;
 uniform vec2 u_mouse_image_dimensions;
 
 uniform sampler2D u_tex0;
 
 void main() {
-  vec2 mouse = u_mouse / u_resolution;
-  vec2 mouse_scale = u_mouse_image_dimensions / u_resolution;
-
   vec2 st = v_texcoord;
 
   st.y = 1.0 - st.y;
 
-  st.x -= mouse.x * 2.0;
-  st.y += mouse.y * 2.0 - 2.0;
+  st.x -= u_mouse.x;
+  st.y += u_mouse.y - 1.0;
 
-  st = st / mouse_scale * 0.65;
+  st = st / u_mouse_image_dimensions;
 
   vec4 tex_color = texture2D(u_tex0, st);
 

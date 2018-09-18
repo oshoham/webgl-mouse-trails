@@ -5,12 +5,10 @@ const mouse = require('mouse-change')()
 
 const fragmentShader = require('./main.frag')
 const chromakeyShader = require('./chromakey.frag')
-const chromakey2Shader = require('./chromakey2.frag')
 const lumadisplaceShader = require('./lumadisplace.frag')
 const edgedetectShader = require('./edgedetect.frag')
 const fadeShader= require('./fade.frag')
 const drawCursorShader = require('./draw-mouse.frag')
-const accumShader = require('./accum.frag')
 const vertexShader = require('./main.vert')
 
 const cursor = require('./osx-cursor.png')
@@ -25,9 +23,9 @@ cursorStyle.innerHTML = `
 `
 document.body.appendChild(cursorStyle)
 
-
-const width = regl._gl.canvas.width
-const height = regl._gl.canvas.height
+const fboScale = 0.75
+const width = 2 * Math.round((regl._gl.canvas.clientWidth * fboScale) / 2)
+const height = 2 * Math.round((regl._gl.canvas.clientHeight * fboScale) / 2)
 const initialConditions = (Array(width * height * 4)).fill(1)
 
 function createBuffer() {
@@ -41,11 +39,8 @@ function createBuffer() {
   })
 }
 
-const currentFrame = createBuffer()
-const feedbackBuffers = Array(2).fill(0).map(createBuffer)
-const displaceBuffer = createBuffer()
 const edgeBuffer = createBuffer()
-const fadeBuffer = createBuffer()
+const feedbackBuffers = Array(2).fill(0).map(createBuffer)
 
 const setupQuad = regl({
   attributes: {
@@ -64,17 +59,16 @@ const drawCursor = regl({
   frag: drawCursorShader,
   vert: vertexShader,
   uniforms: {
-    u_resolution: ({ drawingBufferWidth, drawingBufferHeight }) => [
-      drawingBufferWidth,
-      drawingBufferHeight
+    u_mouse_image_dimensions: ({ boundingRect }) => [
+      cursorWidth / boundingRect.width,
+      cursorHeight / boundingRect.height
     ],
-    u_mouse_image_dimensions: [cursorWidth, cursorHeight],
-    u_mouse: ({ boundingRect, drawingBufferWidth, drawingBufferHeight }) => {
+    u_mouse: ({ boundingRect }) => {
       let mouseX
       if (mouse.x <= boundingRect.left) {
         mouseX = 0
       } else if (mouse.x > boundingRect.right) {
-        mouseX = drawingBufferWidth
+        mouseX = boundingRect.width
       } else {
         mouseX = mouse.x - boundingRect.left
       }
@@ -83,27 +77,16 @@ const drawCursor = regl({
       if (mouse.y >= boundingRect.bottom) {
         mouseY = 0
       } else if (mouse.y < boundingRect.top) {
-        mouseY = drawingBufferHeight
+        mouseY = boundingRect.height
       } else {
-        mouseY = drawingBufferHeight - (mouse.y - boundingRect.top)
+        mouseY = boundingRect.height - (mouse.y - boundingRect.top)
       }
 
-      return [mouseX, mouseY]
+      return [mouseX / boundingRect.width, mouseY / boundingRect.height]
     },
     u_tex0: regl.prop('tex0'),
   },
   framebuffer: regl.prop('framebuffer')
-})
-
-const accum = regl({
-   frag: accumShader,
-   vert: vertexShader,
-   uniforms: {
-     u_erase_color: regl.prop('eraseColor'),
-     u_tex0: regl.prop('tex0'),
-     u_tex1: regl.prop('tex1')
-   },
-   framebuffer: regl.prop('framebuffer')
 })
 
 const chromakey = regl({
@@ -116,21 +99,6 @@ const chromakey = regl({
     u_invert: regl.prop('invert'),
     u_tex0: regl.prop('tex0'),
     u_tex1: regl.prop('tex1')
-  },
-  framebuffer: regl.prop('framebuffer')
-})
-
-const chromakey2 = regl({
-  frag: chromakey2Shader,
-  vert: vertexShader,
-  uniforms: {
-    u_color: regl.prop('color'),
-    u_tolerance: regl.prop('tol'),
-    u_fade: regl.prop('fade'),
-    u_minkey: regl.prop('minkey'),
-    u_maxkey: regl.prop('maxkey'),
-    u_foreground: regl.prop('tex0'),
-    u_background: regl.prop('tex1')
   },
   framebuffer: regl.prop('framebuffer')
 })
@@ -150,10 +118,9 @@ const edgedetect = regl({
   frag: edgedetectShader,
   vert: vertexShader,
   uniforms: {
-    u_resolution: ({ drawingBufferWidth, drawingBufferHeight }) => [
-      drawingBufferWidth,
-      drawingBufferHeight
-    ],
+    u_width: regl.prop('width'),
+    u_height: regl.prop('height'),
+    u_threshold: regl.prop('threshold'),
     u_tex0: regl.prop('tex0')
   },
   framebuffer: regl.prop('framebuffer')
@@ -188,20 +155,16 @@ const setup = cursorImage => {
     setupQuad(() => {
       drawCursor({
         tex0: cursorTexture,
-        framebuffer: currentFrame
+        framebuffer: feedbackBuffers[(tick + 1) % 2]
       })
 
       edgedetect({
-        tex0: currentFrame,
+        width: 1.0 / width,
+        height: 1.0 / height,
+        threshold: 0.25,
+        tex0: feedbackBuffers[(tick + 1) % 2],
         framebuffer: edgeBuffer
       })
-
-      // accum({
-      //   eraseColor: [1.0, 1.0, 1.0, 0.6],
-      //   tex0: currentFrame,
-      //   tex1: feedbackBuffers[tick % 2],
-      //   framebuffer: feedbackBuffers[(tick + 1) % 2]
-      // })
 
       chromakey({
         color: Array(3).fill(0.0).concat(1.0),
@@ -213,32 +176,16 @@ const setup = cursorImage => {
         framebuffer: feedbackBuffers[(tick + 1) % 2]
       })
 
-      // chromakey2({
-      //   color: [0.0, 0.0, 0.0, 1.0],
-      //   tol: 0.3,
-      //   fade: 0.1,
-      //   minkey: 0.0,
-      //   maxkey: 1.,
-      //   tex0: currentFrame,
-      //   tex1: feedbackBuffers[tick % 2],
-      //   framebuffer: feedbackBuffers[(tick + 1) % 2]
-      // })
-
       lumadisplace({
         amp: [0.0, 0.005],
         offset: [0, 0.01],
         tex0: feedbackBuffers[(tick + 1) % 2],
-        framebuffer: displaceBuffer
+        framebuffer: feedbackBuffers[tick % 2],
       })
 
       fade({
         fade: 0.9,
-        tex0: displaceBuffer,
-        framebuffer: fadeBuffer
-      })
-
-      drawTexture({
-        tex0: fadeBuffer,
+        tex0: feedbackBuffers[tick % 2],
         framebuffer: feedbackBuffers[(tick + 1) % 2]
       })
 

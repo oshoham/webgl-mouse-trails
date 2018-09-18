@@ -22,13 +22,13 @@ void main() {
 
   // zero our alphas
   source.a = 0.;
-  target.a = 0.;	
+  target.a = 0.;
 
   // measure distance from target
   vec4 vdelta = abs(source-target);
 
   // sum vector distance, scaling by a third
-  float delta = dot(vdelta,one_third); 
+  float delta = dot(vdelta,one_third);
 
   // determine scaling coefficient witin our fade range
   float scale = smoothstep(abs(u_tol),abs(u_tol)+abs(u_fade),delta);
@@ -36,7 +36,7 @@ void main() {
   // invert if necessary
   float mixamount = mix(scale,1.-scale,u_invert);
 
-  // blend between sources based on mixamount	
+  // blend between sources based on mixamount
   vec4 result = mix(b,a,vec4(mixamount));
 
   // result either blend or mask based on mode
